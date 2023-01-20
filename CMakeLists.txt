@@ -46,7 +46,7 @@ set_property(TARGET ros_control_node PROPERTY CXX_STANDARD 11)  # At least std c
 #############
 
 install(
-  TARGETS ros_control_node  test_go1_hal
+  TARGETS ros_control_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
