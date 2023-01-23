@@ -39,6 +39,10 @@ typedef Eigen::Matrix<double, 6, 1> butterFilterParams;
 
 namespace go12ros {
 
+struct HybridMotorData {
+  double posDes_, velDes_, kp_, kd_, ff_;
+};
+
 class Go1RobotHw : public hardware_interface::RobotHW {
  public:
   Go1RobotHw();
@@ -65,6 +69,8 @@ class Go1RobotHw : public hardware_interface::RobotHW {
   std::vector<double> joint_position_;
   std::vector<double> joint_velocity_;
   std::vector<double> joint_effort_;
+
+  std::vector<go12ros::HybridMotorData> joint_hybrid_;
 
   hardware_interface::ImuSensorHandle::Data imu_data_;
   std::vector<double> imu_orientation_;

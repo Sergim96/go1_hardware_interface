@@ -44,8 +44,8 @@ void Go1RobotHw::init() {
   if (joint_names.size() > 0) {
     initializeJointsInterface(joint_names);
     registerInterface(&joint_state_interface_);
-    registerInterface(&joint_effort_interface_);
-    // registerInterface(&hybridJointInterface_);
+    // registerInterface(&joint_effort_interface_);
+    registerInterface(&hybridJointInterface_);
     velocityFilterBuffer.resize(joint_names.size());
     for (unsigned int i = 0; i < joint_names.size(); i++) {
       // init velocity filters
@@ -184,12 +184,11 @@ void Go1RobotHw::write() {
   std::cout << "write" << std::endl;
   for (unsigned int jj = 0; jj < n_dof_; ++jj) {
     go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].mode = 0x0A;  // motor switch to servo (PMSM) mode
-    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].tau = static_cast<float>(joint_effort_command_[jj]);
-    // these to be sure to have pure torque control mode
-    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].q = unitree::PosStopF;
-    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].Kp = 0;
-    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].dq = unitree::VelStopF;
-    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].Kd = 0;
+    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].tau = static_cast<float>(joint_hybrid_[jj].ff_);
+    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].q = static_cast<float>(joint_hybrid_[jj].posDes_);
+    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].dq = static_cast<float>(joint_hybrid_[jj].velDes_);
+    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].Kp = static_cast<float>(joint_hybrid_[jj].kp_);
+    go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].Kd = static_cast<float>(joint_hybrid_[jj].kd_);
   }
   go1_lowcmd_.head[0] = 0xFE;
   go1_lowcmd_.head[1] = 0xEF;
@@ -220,6 +219,7 @@ void Go1RobotHw::initializeJointsInterface(const std::vector<std::string> &joint
   joint_velocity_.resize(n_dof_);
   joint_effort_.resize(n_dof_);
   joint_effort_command_.resize(n_dof_);
+  joint_hybrid_.resize(n_dof_);
 
   for (unsigned int j = 0; j < n_dof_; j++) {
     ROS_DEBUG_STREAM_NAMED(CLASS_NAME, "Loading joint: " << joint_names[j]);
@@ -228,14 +228,25 @@ void Go1RobotHw::initializeJointsInterface(const std::vector<std::string> &joint
     joint_position_[j] = 1.0;
     joint_velocity_[j] = 0.0;
     joint_effort_[j] = 0.0;  // N/m for continuous joints
+
     joint_effort_command_[j] = 0.0;
 
+    joint_hybrid_[j].posDes_ = 0;
+    joint_hybrid_[j].velDes_ = 0;
+    joint_hybrid_[j].kp_ = 0;
+    joint_hybrid_[j].kd_ = 0;
+    joint_hybrid_[j].ff_ = 0;
     // Create joint state interface for all joints
-    joint_state_interface_.registerHandle(hardware_interface::JointStateHandle(
-        joint_names_[j], &joint_position_[j], &joint_velocity_[j], &joint_effort_[j]));
+    hardware_interface::JointStateHandle state_handle(
+        joint_names_[j], &joint_position_[j], &joint_velocity_[j], &joint_effort_[j]);
+    joint_state_interface_.registerHandle(state_handle);
 
-    joint_effort_interface_.registerHandle(
-        JointHandle(joint_state_interface_.getHandle(joint_names_[j]), &joint_effort_command_[j]));
+    // joint_effort_interface_.registerHandle(
+    //     JointHandle(joint_state_interface_.getHandle(joint_names_[j]), &joint_effort_command_[j]));
+
+    hybridJointInterface_.registerHandle(
+        legged::HybridJointHandle(state_handle, &joint_hybrid_[j].posDes_, &joint_hybrid_[j].velDes_,
+        &joint_hybrid_[j].kp_, &joint_hybrid_[j].kd_, &joint_hybrid_[j].ff_));
   }
 }
 
