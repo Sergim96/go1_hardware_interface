@@ -15,50 +15,44 @@
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>
-*/
+ */
 #ifndef GO1_ROS_CONTROL_H
 #define GO1_ROS_CONTROL_H
 
 #include <memory>
 
-#include <ros/ros.h>
 #include <controller_manager/controller_manager.h>
+#include <ros/ros.h>
 
 #include "go1_interface/go1_robot_hw.hpp"
 
 namespace go12ros {
 
 class Go1ROSControl {
-public:
+ public:
+  std::string CLASS_NAME = "Go1ROSControl";
 
-    std::string CLASS_NAME = "Go1ROSControl";
-
-	Go1ROSControl();
-	~Go1ROSControl();
+  Go1ROSControl();
+  ~Go1ROSControl();
 
   /** @brief init */
-	void init();
+  void init();
 
   /** @brief update */
-	void update(const ros::Time& time, const ros::Duration& period);
+  void update(const ros::Time &time, const ros::Duration &period);
 
-private:
-
+ private:
   /** @brief ROS node handle */
-	std::shared_ptr<ros::NodeHandle> node_handle_;
-	
+  std::shared_ptr<ros::NodeHandle> node_handle_;
+
   /** @brief Go1 Hardware interface */
-	std::shared_ptr<Go1RobotHw> robot_hw_;
+  std::shared_ptr<Go1RobotHw> robot_hw_;
 
-  /** @brief controller_manager provides the infrastructure to load, unload, start and stop controllers */
-	std::shared_ptr<controller_manager::ControllerManager> controller_manager_;
-
-
-
-
+  /** @brief controller_manager provides the infrastructure to load, unload,
+   * start and stop controllers */
+  std::shared_ptr<controller_manager::ControllerManager> controller_manager_;
 };
 
-} // namespace
-
+}  // namespace go12ros
 
 #endif

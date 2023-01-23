@@ -15,55 +15,41 @@
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>
-*/
+ */
 
 #include "go1_interface/go1_ros_control.hpp"
 
-
 namespace go12ros {
 
+Go1ROSControl::Go1ROSControl() {}
 
-Go1ROSControl::Go1ROSControl()
-{
+Go1ROSControl::~Go1ROSControl() {}
 
+void Go1ROSControl::init() {
+  ROS_INFO_NAMED(CLASS_NAME, "Initializing Go1ROSControl");
+
+  // Reset RobotHW
+  robot_hw_.reset(new go12ros::Go1RobotHw);
+
+  // Reseting the namespace of the node handle
+  node_handle_.reset(new ros::NodeHandle(robot_hw_->getRobotName()));
+
+  // Initializing the hardware interface
+  robot_hw_->init();
+
+  // Reseting the controller manager
+  controller_manager_.reset(new controller_manager::ControllerManager(robot_hw_.get(), *node_handle_.get()));
 }
 
+void Go1ROSControl::update(const ros::Time &time, const ros::Duration &period) {
+  // Reading sensor information
+  robot_hw_->read();
 
-Go1ROSControl::~Go1ROSControl()
-{
+  // Updating the controller manager
+  controller_manager_->update(time, period);
 
+  // Writing to the actuator
+  robot_hw_->write();
 }
 
-
-void Go1ROSControl::init()
-{
-    ROS_INFO_NAMED(CLASS_NAME,"Initializing Go1ROSControl");
-
-	// Reset RobotHW
-	robot_hw_.reset(new go12ros::Go1RobotHw);
-
-	// Reseting the namespace of the node handle
-	node_handle_.reset(new ros::NodeHandle(robot_hw_->getRobotName()));
-
-	// Initializing the hardware interface
-	robot_hw_->init();
-
-	// Reseting the controller manager
-	controller_manager_.reset(new controller_manager::ControllerManager(robot_hw_.get(), *node_handle_.get()));
-}
-
-
-void Go1ROSControl::update(const ros::Time& time, const ros::Duration& period)
-{
-	// Reading sensor information
-	robot_hw_->read();
-
-	// Updating the controller manager
-	controller_manager_->update(time, period);
-
-	// Writing to the actuator
-	robot_hw_->write();
-}
-
-
-}
+}  // namespace go12ros
