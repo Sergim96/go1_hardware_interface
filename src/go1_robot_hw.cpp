@@ -55,9 +55,10 @@ void Go1RobotHw::init()
     auto joint_names = loadJointNamesFromSRDF();
     if(joint_names.size()>0)
     {
-      WolfRobotHwInterface::initializeJointsInterface(joint_names);
+      initializeJointsInterface(joint_names);
       registerInterface(&joint_state_interface_);
       registerInterface(&joint_effort_interface_);
+      // registerInterface(&hybridJointInterface_);
       velocityFilterBuffer.resize(joint_names.size());
       for (unsigned int i = 0; i < joint_names.size(); i++)
     	{
@@ -68,8 +69,7 @@ void Go1RobotHw::init()
 	       velocityFilterBuffer[i][3] = 0.0;
 	       velocityFilterBuffer[i][4] = 0.0;
 	       velocityFilterBuffer[i][5] = 0.0;
-	}
-
+	    }
     }
     else
     {
@@ -81,7 +81,7 @@ void Go1RobotHw::init()
     auto imu_name = loadImuLinkNameFromSRDF();
     if(!imu_name.empty())
     {
-      WolfRobotHwInterface::initializeImuInterface(imu_name);
+      initializeImuInterface(imu_name);
       registerInterface(&imu_sensor_interface_);
     }
     else
@@ -208,7 +208,7 @@ void Go1RobotHw::read()
 
 void Go1RobotHw::write()
 {
-
+    std::cout << "write" << std::endl;
     for (unsigned int jj = 0; jj < n_dof_; ++jj)
     {
       go1_lowcmd_.motorCmd[go1_motor_idxs_[jj]].mode = 0x0A;  // motor switch to servo (PMSM) mode
@@ -238,6 +238,117 @@ void Go1RobotHw::startup_routine()
 {
     send_zero_command();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+}
+
+void Go1RobotHw::initializeJointsInterface(const std::vector<std::string>& joint_names)
+{
+    // Resize vectors to our DOF
+    n_dof_ = static_cast<unsigned int>(joint_names.size());
+    joint_names_.resize(n_dof_);
+    joint_types_.resize(n_dof_);
+    joint_effort_limits_.resize(n_dof_);
+    joint_position_.resize(n_dof_);
+    joint_velocity_.resize(n_dof_);
+    joint_effort_.resize(n_dof_);
+    joint_effort_command_.resize(n_dof_);
+
+    for (unsigned int j=0; j < n_dof_; j++)
+    {
+
+        ROS_DEBUG_STREAM_NAMED(CLASS_NAME,"Loading joint: "<< joint_names[j]);
+
+        joint_names_[j]          = joint_names[j];
+        joint_position_[j]       = 1.0;
+        joint_velocity_[j]       = 0.0;
+        joint_effort_[j]         = 0.0;  // N/m for continuous joints
+        joint_effort_command_[j] = 0.0;
+
+        // Create joint state interface for all joints
+        joint_state_interface_.registerHandle(hardware_interface::JointStateHandle(
+                                                  joint_names_[j], &joint_position_[j], &joint_velocity_[j], &joint_effort_[j]));
+
+        joint_effort_interface_.registerHandle(JointHandle(joint_state_interface_.getHandle(joint_names_[j]), &joint_effort_command_[j]));
+    }
+}
+
+void Go1RobotHw::initializeImuInterface(const std::string& imu_link_name)
+{
+    imu_orientation_.resize(4);
+    imu_ang_vel_.resize(3);
+    imu_lin_acc_.resize(3);
+
+    imu_data_.name = "imu";
+    imu_data_.frame_id = imu_link_name;
+    imu_data_.orientation = &imu_orientation_[0];
+    imu_data_.angular_velocity = &imu_ang_vel_[0];
+    imu_data_.linear_acceleration = &imu_lin_acc_[0];
+    imu_sensor_interface_.registerHandle(hardware_interface::ImuSensorHandle(imu_data_));
+}
+
+
+
+std::vector<std::string> Go1RobotHw::loadJointNamesFromSRDF()
+{
+    std::vector<std::string> joint_names;
+    srdf::Model srdf_model;
+    if(parseSRDF(srdf_model))
+    {
+        auto group_states = srdf_model.getGroupStates();
+        for(unsigned int i=0;i<group_states.size();i++)
+            if(group_states[i].name_ == "standup") // Look for the standup group state and get the names of the joints in there
+                for(auto & tmp : group_states[i].joint_values_)
+                    joint_names.push_back(tmp.first);
+    }
+    return joint_names;
+}
+
+std::string Go1RobotHw::loadImuLinkNameFromSRDF()
+{
+    std::string imu_name;
+    srdf::Model srdf_model;
+
+    if(parseSRDF(srdf_model))
+    {
+        auto groups = srdf_model.getGroups();
+        for(unsigned int i=0;i < groups.size(); i++)
+        {
+            const auto& links  = groups[i].links_;
+            if(groups[i].name_.find("imu") != std::string::npos)
+            {
+                if(links.size()==1)
+                    imu_name = links[0];
+                else
+                    throw std::runtime_error("There can be only one imu_sensor defined in the SRDF file!");
+            }
+        }
+    }
+    return imu_name;
+}
+
+bool Go1RobotHw::parseSRDF(srdf::Model& srdf_model)
+{
+  ros::NodeHandle nh;
+  std::string srdf, urdf;
+  if(!nh.getParam("/robot_description",urdf))
+  {
+      ROS_ERROR_NAMED(CLASS_NAME,"robot_description not available in the ros param server");
+      return false;
+  }
+  if(!nh.getParam("/robot_semantic_description",srdf))
+  {
+      ROS_ERROR_NAMED(CLASS_NAME,"robot_semantic_description not available in the ros param server");
+      return false;
+  }
+
+  urdf::ModelInterfaceSharedPtr u = urdf::parseURDF(urdf);
+  if(!srdf_model.initString(*u,srdf))
+  {
+      ROS_ERROR_NAMED(CLASS_NAME,"Can not initialize SRDF model from XML string!");
+      return false;
+  }
+
+  return true;
+
 }
 
 } // namespace

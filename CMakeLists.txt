@@ -6,6 +6,10 @@ find_package(catkin REQUIRED COMPONENTS
   controller_manager
   realtime_tools
   base_hardware_interface
+  hardware_interface
+  srdfdom
+  urdf
+  legged_common
 )
       
 add_subdirectory(go1_hal)
@@ -15,6 +19,7 @@ catkin_package(
    controller_manager
    realtime_tools
    base_hardware_interface
+   legged_common
 )
 
 ##########
